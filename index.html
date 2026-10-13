@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Операційний самоаудит для виробничих компаній України від AC21 Industrial Systems: 12 блоків, індекс зрілості, карта розривів і AI-рішення.">
+<meta name="theme-color" content="#141414">
+<title>Операційний самоаудит AC21</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: маршрутна карта — ліворуч операції 010…120 як маршрут замовлення через цех, праворуч робоче місце з поточним блоком */
+:root{
+  --bg:#141414; --panel:#1B1A19; --panel-2:#23211F; --line:#33302C; --fg:#EEEAE5; --muted:#9C958D;
+  --accent:#E8620A; --accent-ink:#141414; --accent-soft:rgba(232,98,10,.16);
+  --crit:#E5574A; --warn:#E3A33B; --mid:#6FA3C7; --ok:#5DB07A;
+  --f-display:"Geologica","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --gut:clamp(16px,3vw,32px);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#F3F3F1; --panel:#FFFFFF; --panel-2:#ECEBE8; --line:#D9D6D1; --fg:#171615; --muted:#655F58;
+  --accent:#D2560A; --accent-ink:#141414; --accent-soft:rgba(210,86,10,.11);
+  --crit:#C23A2E; --warn:#A87310; --mid:#2C6A94; --ok:#2C7E4C; color-scheme:light;}}
+:root[data-theme="light"]{
+  --bg:#F3F3F1; --panel:#FFFFFF; --panel-2:#ECEBE8; --line:#D9D6D1; --fg:#171615; --muted:#655F58;
+  --accent:#D2560A; --accent-ink:#141414; --accent-soft:rgba(210,86,10,.11);
+  --crit:#C23A2E; --warn:#A87310; --mid:#2C6A94; --ok:#2C7E4C; color-scheme:light;}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--f-body);margin:0;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;gap:18px;max-width:1240px;margin:0 auto;padding-inline:var(--gut);padding-block:12px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;flex:none}
+.mark{font:700 14px/1 var(--f-display);letter-spacing:.03em;background:var(--accent);color:var(--accent-ink);padding:7px 8px;border-radius:2px}
+.brand b{display:block;font:600 14px/1.2 var(--f-display)}
+.brand span{display:block;font:500 11px/1.3 var(--f-mono);color:var(--muted);letter-spacing:.07em;text-transform:uppercase}
+.prog{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
+.prog-bar{flex:1;height:3px;background:var(--line);overflow:hidden}
+.prog-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .35s ease}
+.prog-num{font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 14px/1 var(--f-body);padding:12px 18px;border-radius:2px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:9px 13px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* shell */
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);gap:clamp(24px,4vw,64px);max-width:1240px;margin:0 auto;padding-inline:var(--gut);padding-block:32px 96px}
+.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 80px);align-self:start;max-height:calc(100vh - 110px);overflow:auto}
+.rail-h{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px 10px}
+.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:1px;position:relative}
+.ri{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;padding:8px 10px;border:0;border-radius:2px;background:none;text-align:left;cursor:pointer}
+.ri:hover{background:var(--panel)}
+.ri .code{font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.ri .nm{font-size:14px;line-height:1.3}
+.ri .ct{font:500 11px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.ri.done .ct{color:var(--ok)}
+.ri[aria-current="step"]{background:var(--panel-2)}
+.ri[aria-current="step"] .code{color:var(--accent)}
+.ri.res{margin-top:10px;border-top:1px solid var(--line);border-radius:0;padding-top:14px}
+.rail-note{font-size:12px;color:var(--muted);margin:18px 10px 0;line-height:1.5}
+
+main{min-width:0}
+.eyebrow{font:500 12px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0}
+h1{font:700 clamp(32px,4.8vw,56px)/1.04 var(--f-display);letter-spacing:-.025em;margin:14px 0 18px;text-wrap:balance;max-width:16ch}
+h2{font:600 clamp(24px,2.8vw,32px)/1.12 var(--f-display);letter-spacing:-.015em;margin:10px 0 12px;text-wrap:balance}
+h3{font:600 18px/1.25 var(--f-display);margin:0 0 10px}
+.lead{font-size:17px;line-height:1.6;color:var(--muted);max-width:62ch;margin:0}
+p{margin:0}
+
+/* intro */
+.facts{display:flex;flex-wrap:wrap;gap:0;margin:28px 0 36px;border-block:1px solid var(--line)}
+.fact{padding:16px 22px 16px 0;margin-right:22px;display:grid;gap:2px}
+.fact b{font:600 24px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.fact span{font-size:13px;color:var(--muted)}
+.intro-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:22px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fld{display:grid;gap:6px;min-width:0}
+.fld.full{grid-column:1/-1}
+.fld label{font:500 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:10px 12px;font-size:15px}
+.fld textarea{min-height:76px;resize:vertical}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--accent)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.legend{display:grid;gap:0}
+.lg{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.lg:first-of-type{border-top:0}
+.lg b{font:600 15px var(--f-mono);color:var(--accent)}
+.lg strong{display:block;font-weight:600;font-size:14px}
+.lg span{font-size:13px;color:var(--muted)}
+.privacy{font-size:13px;color:var(--muted);margin-top:16px;max-width:60ch}
+.gets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:36px}
+.gets div{background:var(--bg);padding:16px 18px}
+.gets b{display:block;font:600 14px var(--f-display);margin-bottom:4px}
+.gets span{font-size:13px;color:var(--muted)}
+
+/* block */
+.blk-h{display:grid;gap:4px;margin-bottom:8px}
+.dirs{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.dir{font:500 12px var(--f-mono);border:1px solid var(--line);padding:4px 8px;border-radius:2px;color:var(--muted)}
+.dir em{font-style:normal;color:var(--accent)}
+.bprog{font:500 12px var(--f-mono);color:var(--muted);margin:22px 0 4px;font-variant-numeric:tabular-nums}
+.q{padding:24px 0;border-top:1px solid var(--line);display:grid;gap:14px}
+.q-head{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px}
+.q-num{font:500 13px var(--f-mono);color:var(--muted);padding-top:3px;font-variant-numeric:tabular-nums}
+.q-t{font-size:16.5px;font-weight:500;line-height:1.45;max-width:64ch}
+.hint{margin-top:6px}
+.hint summary{cursor:pointer;color:var(--muted);font-size:13px;list-style:none;display:inline-flex;gap:6px}
+.hint summary::-webkit-details-marker{display:none}
+.hint summary::before{content:"+";font-family:var(--f-mono);color:var(--accent)}
+.hint[open] summary::before{content:"−"}
+.hint p{font-size:14px;color:var(--muted);margin-top:6px;max-width:62ch;border-left:2px solid var(--accent);padding-left:10px}
+.answer{margin-left:60px;display:grid;gap:8px}
+.scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.opt{position:relative;min-width:0}
+.opt input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cell{display:flex;flex-direction:column;gap:3px;padding:9px 10px 8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;min-height:56px;transition:background .15s,border-color .15s}
+.opt:first-child .cell{border-radius:2px 0 0 2px}.opt:last-child .cell{border-radius:0 2px 2px 0}
+.cell:hover{border-color:var(--muted)}
+.cell .v{font:600 15px/1 var(--f-mono)}
+.cell .l{font-size:12px;line-height:1.2;color:var(--muted);overflow-wrap:anywhere}
+.cell.on{background:var(--accent-soft);border-color:var(--accent)}
+.opt input:checked + .cell{background:var(--accent);border-color:var(--accent)}
+.opt input:checked + .cell .v,.opt input:checked + .cell .l{color:var(--accent-ink)}
+.opt input:focus-visible + .cell,.chip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+.extra{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;width:1px;height:1px}
+.chip span{display:inline-block;font-size:13px;padding:5px 11px;border:1px dashed var(--line);border-radius:999px;color:var(--muted);cursor:pointer}
+.chip input:checked + span{border-style:solid;border-color:var(--fg);color:var(--fg);background:var(--panel-2)}
+.bnav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:24px;border-top:1px solid var(--line)}
+.demo-flag{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--accent);padding:10px 14px;border-radius:2px;margin-bottom:24px;font-size:14px}
+
+/* results */
+.res-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:16px;margin-bottom:24px}
+.kpis{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:28px}
+.kpi{background:var(--panel);padding:20px 22px;display:grid;gap:6px;align-content:start}
+.kpi .lab{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi .num{font:700 48px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .num small{font-size:20px;color:var(--muted);font-weight:600}
+.kpi .sub{font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--f-mono);letter-spacing:.03em;padding:4px 9px;border-radius:999px;border:1px solid currentColor;width:max-content}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.c-crit{color:var(--crit)}.c-warn{color:var(--warn)}.c-mid{color:var(--mid)}.c-ok{color:var(--ok)}.c-na{color:var(--muted)}
+.map{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:center;margin-bottom:40px}
+.radar{width:100%;max-width:440px;height:auto;display:block;margin:0 auto}
+.radar text{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted)}
+.bars{display:grid;gap:0}
+.bar{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(70px,1.1fr) 44px;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.bar:hover .bn{color:var(--accent)}
+.bar .bc{font:500 12px var(--f-mono);color:var(--muted)}
+.bar .bn{font-size:14px;min-width:0}
+.bar .bt{height:8px;background:var(--panel-2);position:relative}
+.bar .bt i{position:absolute;inset:0 auto 0 0;background:currentColor}
+.bar .bv{font:600 13px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.sec{margin-top:44px}
+.sec > p.lead{margin-bottom:18px}
+.gaps{display:grid;gap:0;counter-reset:g}
+.gap{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:18px 0;border-top:1px solid var(--line)}
+.gap .gn{font:600 22px/1 var(--f-display);color:var(--accent);font-variant-numeric:tabular-nums}
+.gap .gm{display:flex;flex-wrap:wrap;gap:6px 12px;font:500 12px var(--f-mono);color:var(--muted);margin-bottom:6px}
+.gap .gt{font-weight:500;font-size:15.5px;margin-bottom:8px}
+.gap .ga{font-size:14px;color:var(--fg);background:var(--panel);border-left:2px solid var(--accent);padding:9px 12px}
+.gap .ga b{font:600 11px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:3px}
+.prio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.prio .panel{display:grid;gap:8px;align-content:start}
+.prio .rk{font:500 12px var(--f-mono);color:var(--muted)}
+.det{border-top:1px solid var(--line)}
+.det summary{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 0;cursor:pointer;list-style:none}
+.det summary::-webkit-details-marker{display:none}
+.det summary .bc{font:500 12px var(--f-mono);color:var(--muted)}
+.det summary .bn{font-weight:600}
+.det-body{padding:0 0 18px 44px;display:grid;gap:10px}
+.drow{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;font-size:14px;padding:8px 0;border-top:1px dashed var(--line)}
+.drow .ans{font:500 12px var(--f-mono);text-align:right}
+.drow .rec{grid-column:1/-1;color:var(--muted);font-size:13px}
+.drow .rec b{color:var(--accent);font-weight:600}
+.export{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center}
+.export .btns{display:flex;flex-wrap:wrap;gap:8px}
+.ex-note{font-size:13px;color:var(--muted);margin-top:8px}
+.cta{margin-top:44px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);padding:26px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px}
+.contacts{display:grid;gap:10px;font:500 14px var(--f-mono)}
+.contacts span{display:block;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.contacts a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line);user-select:all}
+.contacts a:hover{border-color:var(--accent)}
+.empty{padding:40px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:11px 16px;border-radius:2px;font-size:14px;z-index:50;max-width:calc(100% - 32px)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (max-width:960px){
+  .shell{grid-template-columns:minmax(0,1fr);padding-top:0}
+  .rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 57px);z-index:20;max-height:none;overflow-x:auto;background:var(--bg);margin-inline:calc(-1 * var(--gut));padding-inline:var(--gut);padding-block:10px;border-bottom:1px solid var(--line);scrollbar-width:none}
+  .rail-h,.rail-note{display:none}
+  .rail ol{display:flex;gap:6px;width:max-content}
+  .ri{grid-template-columns:auto auto;padding:7px 11px;border:1px solid var(--line);white-space:nowrap}
+  .ri .ct{display:none}
+  .ri.res{margin-top:0;padding-top:7px;border-top:1px solid var(--line);border-radius:2px}
+  main{padding-top:26px}
+  .intro-grid,.map,.cta,.export{grid-template-columns:minmax(0,1fr)}
+  .prio{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .brand span{display:none}
+  .prog-bar{display:none}
+  .prog{justify-content:flex-end}
+  .answer{margin-left:0}
+  .q-head{grid-template-columns:44px minmax(0,1fr)}
+  .cell{padding:8px 6px;min-height:52px}
+  .cell .l{font-size:11px}
+  .form{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:minmax(0,1fr)}
+  .gets{grid-template-columns:minmax(0,1fr)}
+  .bar{grid-template-columns:30px minmax(0,1fr) 60px 40px}
+  .det-body{padding-left:0}
+  .drow{grid-template-columns:minmax(0,1fr) 92px}
+  .top .btn{padding:9px 11px;font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a class="logo" href="https://www.ac21industrial.com/" target="_blank" rel="noopener">
+      <span class="mark">AC21</span>
+      <span class="brand"><b>AC21 Industrial Systems</b><span>Операційний самоаудит</span></span>
+    </a>
+    <div class="prog" aria-label="Прогрес заповнення">
+      <div class="prog-bar"><i id="progFill"></i></div>
+      <span class="prog-num" id="progNum">0 / 0</span>
+    </div>
+    <button class="btn pri sm" data-act="results" type="button">Результати</button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Блоки самоаудиту">
+    <p class="rail-h">Маршрутна карта</p>
+    <ol id="rail"></ol>
+    <p class="rail-note">Відповіді зберігаються лише у вашому браузері. Можна перерватися й повернутися пізніше.</p>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Content ---------- */
+const DIRS = {
+  "01":"Технічна документація R&D","02":"Операційна координація","03":"Інженерні правила",
+  "04":"Польові дані для R&D","05":"Інтелектуальна власність","06":"Ринкова та конкурентна аналітика","07":"Автоматизація продажів"
+};
+const LV = [
+  {v:0,s:"Немає",t:"Відсутнє",d:"Процесу чи практики немає."},
+  {v:1,s:"Стихійно",t:"Стихійно",d:"Тримається на окремих людях, у головах і чатах."},
+  {v:2,s:"Частково",t:"Частково",d:"Є домовленості й таблиці, але вручну і не завжди."},
+  {v:3,s:"Системно",t:"Системно",d:"Регламент працює, дані ведуться в системі чи Excel."},
+  {v:4,s:"Цифрово",t:"Цифрово",d:"Система з даними в реальному часі та метриками."}
+];
+const B = [
+ {id:"mgmt",code:"010",name:"Управління та планування",short:"Управління",dir:["02"],
+  desc:"Як цілі власника перетворюються на план, а план — на щоденні рішення в цеху.",qs:[
+  {id:"m1",t:"Річні цілі компанії розкладені на квартальні KPI для кожного відділу, і керівники відділів знають свої цифри.",h:"5–7 показників на відділ, у кожного є власник, факт переглядається щомісяця.",ai:"Дерево KPI і щомісячний звіт, який збирається автоматично з облікових систем, а не вручну перед нарадою."},
+  {id:"m2",d:1,t:"Власник і директор бачать стан замовлень, виробництва, закупівель і грошей в одній картині, без ручного зведення з чатів і Excel.",h:"Один екран зі статусом на сьогодні; зведення не забирає нікому годин щотижня.",ai:"Операційний дашборд: AI-агент щодня зводить дані з обліку, CRM і чатів у статус-картину з вузькими місцями."},
+  {id:"m3",t:"Зрозуміло, хто яке рішення ухвалює, і рішення фіксуються разом з обґрунтуванням.",h:"Є матриця повноважень; через пів року можна знайти, хто, коли і чому погодив зміну.",ai:"Журнал рішень: асистент фіксує рішення з нарад і листування, відповідальних і строки."},
+  {id:"m4",t:"Наради мають порядок денний, протокол і контроль виконання доручень.",h:"Доручення з наради того ж дня з’являються в таск-системі з відповідальним і строком.",ai:"Протоколи нарад із запису: доручення автоматично потрапляють у трекер і нагадуються."},
+  {id:"m5",t:"Наскрізний процес від заявки клієнта до відвантаження описаний, і на практиці його дотримуються.",h:"Схема процесу актуальна, кожна передача між відділами має власника і стандарт.",ai:"Аналіз фактичного процесу за даними систем: де він розходиться з регламентом і де губляться передачі."},
+  {id:"m6",t:"Є план безперервності роботи на випадок блекаутів, обстрілів, втрати ключових людей чи постачальника.",h:"Сценарії розписані, відповідальні призначені, план перевірявся на практиці за останній рік.",ai:"Сценарне моделювання: як змінюються план і строки при втраті лінії, людей чи постачальника."}]},
+ {id:"rnd",code:"020",name:"R&D та інженерія",short:"R&D",dir:["01","04","05"],
+  desc:"Як потреба замовника стає перевіреним кресленням, а креслення — стабільною серією.",qs:[
+  {id:"r1",dir:"01",t:"Вимоги до виробу зафіксовані письмово з критеріями приймання, а не передаються усно чи в месенджері.",h:"Кожна вимога перевірювана: відомо, яким тестом і з яким результатом її вважають виконаною.",ai:"Пакет вимог і критеріїв приймання з ТЗ і листування замовника; трасування вимога → рішення → тест."},
+  {id:"r2",dir:"01",d:1,t:"Креслення, 3D-моделі та специфікації (BOM) мають версії, і цех завжди працює за актуальною.",h:"Застаріле креслення не може потрапити на дільницю; видно, яка версія пішла в яку партію.",ai:"Контроль конфігурацій: креслення, BOM і техкарти прив’язані до версії виробу, цех отримує сповіщення про зміни."},
+  {id:"r3",dir:"01",t:"Зміни в конструкції проходять через формальне повідомлення про зміну з оцінкою впливу на закупівлі, склад і виробництво.",h:"До затвердження зміни відомо, які залишки, замовлення постачальникам і партії вона зачіпає.",ai:"AI-оцінка впливу зміни на партії, закупівлі й залишки ще до її затвердження."},
+  {id:"r4",dir:"04",d:1,t:"Відгуки з поля (від замовника, сервісу, з фронту) системно доходять до інженерів і прив’язуються до версії виробу.",h:"Кожен відгук має статус, критичність і версію; повторювані проблеми видно як частоту.",ai:"Приймання відгуків у тому вигляді, як їх надсилають (голосові, фото, чати), і перетворення на дефекти та вимоги."},
+  {id:"r5",dir:"01",t:"Результати випробувань зберігаються як доказова база, яку можна показати партнеру, замовнику чи інвестору.",h:"Для кожної ключової характеристики є протокол: умови, метод, результат, версія виробу.",ai:"Живий evidence package: протоколи випробувань збираються автоматично і прив’язуються до вимог."},
+  {id:"r6",dir:"05",t:"Створені технічні рішення інвентаризовані: зрозуміло, що є ноу-хау, що варто патентувати і які права мають партнери.",h:"Є реєстр розробок з авторами й датами; права у спільних проєктах розмежовані договором.",ai:"Реєстр інтелектуальної власності і підготовка вихідних матеріалів для патентного повіреного."}]},
+ {id:"mkt",code:"030",name:"Маркетинг",short:"Маркетинг",dir:["06"],
+  desc:"Чи знає компанія, кому і чому вона продає, і що в цей час робить конкурент.",qs:[
+  {id:"k1",t:"Цільові сегменти та портрет ідеального замовника описані, і продажі працюють саме з ними.",h:"Відомо, які 2–3 сегменти дають основну маржу, і на них іде більшість зусиль.",ai:"Сегментація бази клієнтів за маржею й повторністю; портрет ідеального замовника на даних."},
+  {id:"k2",t:"Є актуальні профілі конкурентів: продукти, характеристики, ціни, ринки, публічні контракти.",h:"Профілі оновлювалися за останній квартал і використовуються в переговорах.",ai:"Постійний моніторинг конкурентів: сайти, тендери, виставки, новини у щотижневому дайджесті."},
+  {id:"k3",t:"Цінність продукту сформульована мовою замовника; є кейси, техописи й презентації для кожного сегмента і мови ринку.",h:"Менеджер за 10 хвилин збирає англійською пакет матеріалів під конкретного замовника.",ai:"Генерація техописів, презентацій і кейсів під сегмент і мову ринку з вашої технічної бази."},
+  {id:"k4",d:1,t:"Відомо, з яких каналів приходять замовники і скільки коштує залучення одного.",h:"Кожен лід має джерело; можна порахувати, які виставки чи канали окупаються.",ai:"Наскрізна аналітика «джерело → угода → маржа», щоб бюджет ішов у канали, що окупаються."},
+  {id:"k5",t:"Компанія системно відстежує тендери та регуляторні вимоги на цільових ринках (Prozorro, ЄС, NSPA).",h:"Є перелік джерел, відповідальний і щотижневий огляд нових закупівель.",ai:"Агент моніторингу тендерів: відбирає закупівлі під ваш продукт і готує чек-лист вимог."}]},
+ {id:"sales",code:"040",name:"Продажі",short:"Продажі",dir:["07"],
+  desc:"Від запиту до договору, який компанія реально здатна виконати в строк.",qs:[
+  {id:"s1",d:1,t:"Усі запити, угоди й контакти ведуться в CRM, а не в особистих телефонах і поштових скриньках менеджерів.",h:"Якщо менеджер звільняється, вся історія переговорів лишається в компанії.",ai:"Автоматичне перенесення листів, дзвінків і месенджерів у CRM без ручного введення."},
+  {id:"s2",t:"Комерційна пропозиція рахується від фактичної собівартості та поточного завантаження виробництва.",h:"Ціна і строк у КП підтверджені даними, а не лише досвідом менеджера.",ai:"Калькулятор КП, що бере собівартість з обліку і перевіряє строк проти реального завантаження цеху."},
+  {id:"s3",t:"Перед підписанням технічний запит перевіряють інженерія та виробництво на реалістичність вимог і строків.",h:"Є стандартна процедура погодження з відповідальними і граничним часом відповіді.",ai:"Перевірка ТЗ на виконуваність до відправки КП: компоненти, потужності, строки, ризики."},
+  {id:"s4",d:1,t:"Прогноз продажів на квартал ґрунтується на даних воронки, і його точність перевіряється.",h:"Відхилення прогнозу від факту відоме і зменшується з кожним кварталом.",ai:"Прогноз на основі історії воронки й виробничих даних замість оптимізму менеджера."},
+  {id:"s5",t:"Після підписання зобов’язання перед замовником (строки, гарантії, штрафи) відстежуються.",h:"Будь-хто в компанії бачить, що і до якої дати пообіцяли кожному клієнту.",ai:"Реєстр зобов’язань: AI виймає з договорів строки та штрафні умови і нагадує заздалегідь."}]},
+ {id:"prod",code:"050",name:"Виробничий цикл",short:"Виробництво",dir:["02"],
+  desc:"Чи керований шлях замовлення через цех і чи видно вузькі місця до зриву строку.",qs:[
+  {id:"p1",t:"Виробничий план формується з портфеля замовлень з урахуванням потужностей, а не за принципом «хто голосніше просить».",h:"План на тиждень затверджений, зміни в ньому фіксуються з причиною.",ai:"AI-планувальник: черговість запуску з урахуванням потужностей, матеріалів і пріоритетів."},
+  {id:"p2",d:1,t:"Для кожного виробу є маршрутна та технологічна карта з нормами часу.",h:"Норми часу перевірені фактом за останній рік, а не взяті «з досвіду».",ai:"Оцифрування техкарт і уточнення норм часу за фактичними даними виконання."},
+  {id:"p3",d:1,t:"У будь-який момент видно, на якій операції перебуває кожне замовлення.",h:"На питання «де замовлення?» відповідають без дзвінка в цех.",ai:"Облік операцій через QR чи планшет на дільниці: статус кожного замовлення в реальному часі."},
+  {id:"p4",d:1,t:"Вимірюється тривалість виробничого циклу і частка замовлень, відвантажених вчасно (OTD).",h:"OTD відомий щомісяця, причини затримок класифіковані.",ai:"Автоматичний розрахунок OTD і циклу з класифікацією причин затримок."},
+  {id:"p5",t:"Вузьке місце виробництва відоме, і план будується навколо нього.",h:"Можна назвати дільницю, що обмежує випуск, і її завантаження у відсотках.",ai:"Аналіз черг і завантаження дільниць, щоб бачити вузьке місце до зриву строку."}]},
+ {id:"supply",code:"060",name:"Постачання та закупівлі",short:"Постачання",dir:["02"],
+  desc:"Чи прийде потрібний компонент вчасно, за прийнятною ціною і від надійного постачальника.",qs:[
+  {id:"u1",d:1,t:"Потреба в матеріалах розраховується з BOM і виробничого плану з урахуванням залишків, а не на око.",h:"Замовлення постачальникам формуються з розрахунку; відхилення від нього — виняток.",ai:"MRP-розрахунок із залишками, товарами в дорозі та страховим запасом; чернетки замовлень постачальникам."},
+  {id:"u2",t:"Для критичних компонентів є щонайменше два перевірені постачальники.",h:"Перелік критичних позицій складено, ризик єдиного джерела оцінено.",ai:"Пошук і кваліфікація альтернативних постачальників; карта ризиків єдиного джерела."},
+  {id:"u3",d:1,t:"Строки поставки відстежуються, і затримку видно до того, як вона зупинить виробництво.",h:"Кожне замовлення постачальнику має статус і сигнал ризику запізнення.",ai:"Агент, що читає листування з постачальниками, оновлює статуси й попереджає про ризик зриву."},
+  {id:"u4",d:1,t:"Є історія цін і умов постачання, пропозиції постачальників порівнюються.",h:"Закупівельне рішення можна пояснити порівнянням кількох пропозицій або історією цін.",ai:"Аналіз історії цін і автоматичне порівняння пропозицій постачальників."},
+  {id:"u5",t:"Імпорт, митне оформлення та валютні ризики плануються заздалегідь.",h:"Строки розмитнення закладені в план, вплив курсу на собівартість відомий.",ai:"Контроль імпортних документів і сигнали про вплив курсу на собівартість замовлень."}]},
+ {id:"stock",code:"070",name:"Склад і логістика",short:"Склад",dir:["02"],
+  desc:"Чи збігаються залишки в обліку з тим, що лежить на полиці.",qs:[
+  {id:"w1",d:1,t:"Залишки в обліковій системі збігаються з фактичними на полиці.",h:"Розбіжність на інвентаризації менше 2% за вартістю.",ai:"Вибіркові інвентаризації з мобільним скануванням і аналіз причин розбіжностей."},
+  {id:"w2",t:"Для критичних позицій задано мінімальні залишки, і досягнення мінімуму видно автоматично.",h:"Про відсутність деталі не дізнаються в момент, коли вона потрібна на складанні.",ai:"Динамічні мінімальні залишки за історією споживання і строками поставок."},
+  {id:"w3",d:1,t:"Матеріали й вироби маркуються (штрихкод чи QR, партія, серійний номер) і простежуються.",h:"За серійним номером виробу знаходяться партії компонентів, з яких його зібрано.",ai:"Наскрізна простежуваність від партії компонента до відвантаженого виробу."},
+  {id:"w4",d:1,t:"Матеріали видаються в цех під конкретне замовлення.",h:"Перевитрата матеріалу на замовленні видна і має пояснення.",ai:"Списання під замовлення для фактичної собівартості і контролю перевитрат."},
+  {id:"w5",t:"Відвантажувальні та експортні документи формуються без ручного перенабору даних.",h:"ТТН, пакувальні листи й інвойси генеруються з однієї облікової картки.",ai:"Автоматичне формування ТТН, пакувальних листів і документів для експорту."}]},
+ {id:"equip",code:"080",name:"Устаткування та ТОіР",short:"Устаткування",dir:["02"],
+  desc:"Чи працює обладнання, коли воно потрібне, і чи відомо, скільки коштує простій.",qs:[
+  {id:"e1",d:1,t:"Є реєстр обладнання з паспортами, історією ремонтів і відповідальними.",h:"Для кожного верстата за хвилину знаходиться інструкція, історія і дата останнього ТО.",ai:"Цифровий реєстр обладнання і AI-асистент, що відповідає за інструкціями виробника."},
+  {id:"e2",t:"Планово-попереджувальне обслуговування виконується за графіком, а не лише після поломки.",h:"Понад 80% робіт з ТО — планові.",ai:"Графік ППО з нагадуваннями і поступовий перехід до обслуговування за станом."},
+  {id:"e3",d:1,t:"Простої фіксуються з причинами, рахується загальна ефективність обладнання (OEE).",h:"OEE ключових верстатів відомий щомісяця, топ-причини простоїв названі.",ai:"Збір причин простоїв з цеху і розрахунок OEE; виявлення хронічних втрат."},
+  {id:"e4",t:"Перелік критичних запчастин визначено, їх наявність і строки поставки відомі.",h:"Поломка ключового вузла не зупиняє лінію довше ніж на добу.",ai:"Перелік критичних запчастин за ризиком зупинки лінії і контроль їх наявності."},
+  {id:"e5",t:"Виробництво енергостійке: є резервне живлення і план роботи під час відключень.",h:"Відомо, які лінії працюють від генератора, графік перебудовується за години.",ai:"Енергоплан: перерахунок виробничого графіка під відключення і доступну потужність."},
+  {id:"e6",d:1,t:"Ключове обладнання (ЧПК, лінії, печі) передає дані про роботу автоматично.",h:"Завантаження і простої верстатів видно без ручного запису оператора.",ai:"Підключення верстатів (OPC UA, MTConnect чи датчики) для автоматичного обліку завантаження."}]},
+ {id:"quality",code:"090",name:"Якість",short:"Якість",dir:["03"],
+  desc:"Чи ловить компанія дефекти до замовника і чи вчиться на них.",qs:[
+  {id:"a1",d:1,t:"Є вхідний, операційний і вихідний контроль з чіткими критеріями та записами.",h:"Записи контролю зберігаються і пов’язані з партією чи серійним номером.",ai:"Цифрові чек-листи контролю з фото на планшеті; дані одразу потрапляють у систему якості."},
+  {id:"a2",d:1,t:"Невідповідності реєструються, аналізуються причини (8D, «5 чому»), коригувальні дії доводяться до кінця.",h:"Кожна невідповідність має власника, причину і закриту дію з перевіркою ефективності.",ai:"Реєстр невідповідностей з AI-підказками кореневих причин за історією схожих дефектів."},
+  {id:"a3",d:1,t:"Втрати від браку й переробок відомі в гривнях.",h:"Щомісяця відома сума втрат від браку в розрізі дільниць.",ai:"Розрахунок вартості браку й переробок за замовленнями та дільницями."},
+  {id:"a4",t:"Неписані інженерні правила (допуски, заборонені комбінації, послідовності операцій) зафіксовані й перевіряються до запуску.",h:"Нова специфікація перевіряється на відомі правила ще на етапі проєктування.",ai:"Витягнути правила з історії дефектів і доопрацювань та перевіряти специфікації до запуску."},
+  {id:"a5",t:"Система якості відповідає стандартам, яких вимагають замовники (ISO 9001, AQAP, вимоги ЄС).",h:"Сертифікат є або підготовка йде за планом; документація актуальна.",ai:"Gap-аналіз документації проти ISO 9001 чи AQAP і чернетки процедур, яких бракує."}]},
+ {id:"people",code:"100",name:"Персонал і навчання",short:"Персонал",dir:[],
+  desc:"Чи тримається виробництво на системі, а не на кількох незамінних людях.",qs:[
+  {id:"h1",d:1,t:"Є матриця компетенцій: хто яку операцію виконує і на якому рівні.",h:"Для кожної критичної операції є щонайменше двоє підготовлених виконавців.",ai:"Матриця компетенцій і планування заміни та навчання під вузькі місця."},
+  {id:"h2",t:"Новий працівник проходить структуровану адаптацію з програмою і наставником.",h:"Час до самостійної роботи відомий і скорочується.",ai:"AI-асистент для новачків, що відповідає на питання за інструкціями й техкартами."},
+  {id:"h3",t:"Робочі інструкції актуальні, зрозумілі й доступні на робочому місці, з фото чи відео.",h:"Інструкцію можна відкрити біля верстата за 30 секунд.",ai:"Покрокові інструкції з фото й відео досвідчених майстрів, зібрані за допомогою AI."},
+  {id:"h4",t:"Відомо, які знання тримаються на одній людині, і є план їх передачі з урахуванням мобілізації та бронювання.",h:"Перелік ключових людей складено, знання кожного частково задокументовані.",ai:"Інтерв’ю з ключовими фахівцями і перетворення їхніх знань на базу, по якій можна шукати."},
+  {id:"h5",t:"План навчання пов’язаний з потребами виробництва і виконується.",h:"Навчання планують від дефектів, вузьких місць і нових виробів, а не формально.",ai:"Плани навчання й мікрокурси на основі реальних помилок і дефектів."}]},
+ {id:"fin",code:"110",name:"Фінанси та собівартість",short:"Фінанси",dir:[],
+  desc:"Чи знає компанія, на чому вона заробляє, а на чому втрачає.",qs:[
+  {id:"f1",d:1,t:"Відома фактична собівартість кожного виробу чи замовлення, а не лише нормативна.",h:"Після закриття замовлення видно розрив між плановою і фактичною собівартістю.",ai:"Фактична собівартість з даних складу, нарядів і накладних витрат."},
+  {id:"f2",d:1,t:"Маржинальність рахується за замовленнями, клієнтами й продуктами.",h:"Можна назвати три найменш прибуткові замовлення минулого кварталу і причину.",ai:"Аналітика маржі за клієнтами й продуктами з сигналами про збиткові угоди."},
+  {id:"f3",d:1,t:"Є прогноз руху коштів щонайменше на три місяці вперед.",h:"Касовий розрив видно за місяць до того, як він настане.",ai:"Прогноз руху коштів з договорів, графіків оплат і закупівель."},
+  {id:"f4",t:"План-факт бюджету розбирається щомісяця з поясненням відхилень.",h:"Відхилення понад 10% мають пояснення і рішення.",ai:"Автоматичні пояснення відхилень план-факт і щомісячний звіт для власника."},
+  {id:"f5",d:1,t:"Дебіторська та кредиторська заборгованість контролюються, прострочки видно вчасно.",h:"Прострочена дебіторка має відповідального і дату наступного кроку.",ai:"Пріоритезовані нагадування контрагентам і контроль прострочок."}]},
+ {id:"data",code:"120",name:"Дані, ІТ та безпека",short:"Дані та ІТ",dir:[],
+  desc:"Чи є на чому будувати AI: облікові дані, інтеграції, доступи і правила.",qs:[
+  {id:"d1",d:1,t:"Є основна облікова система (ERP, BAS, Odoo, MES тощо), і нею справді користуються всі відділи.",h:"Паралельні таблиці Excel — виняток, а не основний інструмент.",ai:"Аудит облікового ландшафту: що є, що дублюється, яке джерело правди для яких даних."},
+  {id:"d2",d:1,t:"Системи інтегровані між собою: дані не переносяться вручну між Excel, обліком і CRM.",h:"Одна й та сама інформація вводиться один раз.",ai:"Інтеграції та агенти, що переносять дані між системами без ручного перенабору."},
+  {id:"d3",t:"Доступи розподілені за ролями, є журнал дій, резервні копії й перевірений план відновлення.",h:"Відновлення з резервної копії перевірялося за останні пів року.",ai:"Рольова модель доступу перед підключенням AI: хто бачить які дані."},
+  {id:"d4",d:1,t:"Документи (креслення, договори, інструкції) зберігаються централізовано і знаходяться за хвилину.",h:"Немає «правильної версії на флешці в головного інженера».",ai:"Корпоративний пошук по документах з AI: відповідь з посиланням на джерело."},
+  {id:"d5",t:"Є правила використання AI-інструментів працівниками: що можна завантажувати, а що ні.",h:"Працівники знають правила; креслення й договори не потрапляють у публічні сервіси.",ai:"Політика використання AI і безпечне середовище у вашій інфраструктурі."}]}
+];
+const ALLQ = B.flatMap(b => b.qs.map(q => ({b, q})));
+const TOTAL = ALLQ.length;
+const INDUSTRIES = ["Оборонне / miltech / dual-use","Машинобудування","Металообробка","Електроніка та приладобудування","Харчова промисловість","Хімія, пластики, гума","Деревообробка та меблі","Будівельні матеріали","Легка промисловість","Фармацевтика","Інше"];
+const SIZES = ["до 20","20–50","50–250","250–1000","понад 1000"];
+const CONTACTS = [{l:"WhatsApp",t:"+380 67 779 95 36",h:"https://wa.me/380677799536"},{l:"WhatsApp",t:"+380 93 486 41 17",h:"https://wa.me/380934864117"},{l:"Сайт",t:"www.ac21industrial.com",h:"https://www.ac21industrial.com/"}];
+
+/* ---------- State ---------- */
+const KEY = "ac21-selfaudit-v1";
+let S = {profile:{company:"",industry:"",size:"",role:"",pain:""},answers:{},view:"intro",demo:false};
+try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw); if (p && p.answers) S = Object.assign(S, p); } } catch(e) {}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- Scoring ---------- */
+function val(a){ if (a === "na" || a === undefined) return null; if (a === "dk") return 0; return a; }
+function answered(){ return ALLQ.filter(x => S.answers[x.q.id] !== undefined).length; }
+function blockAnswered(b){ return b.qs.filter(q => S.answers[q.id] !== undefined).length; }
+function blockScore(b){ const vs = b.qs.map(q => val(S.answers[q.id])).filter(v => v !== null); if (!vs.length) return null; return Math.round(vs.reduce((a,c)=>a+c,0) / (4*vs.length) * 100); }
+function overall(){ const s = B.map(blockScore).filter(v => v !== null); return s.length ? Math.round(s.reduce((a,c)=>a+c,0)/s.length) : null; }
+function dataReady(){ const vs = ALLQ.filter(x => x.q.d).map(x => val(S.answers[x.q.id])).filter(v => v !== null); return vs.length ? Math.round(vs.reduce((a,c)=>a+c,0)/(4*vs.length)*100) : null; }
+function level(p){
+  if (p === null) return {k:"na",t:"Немає даних",d:""};
+  if (p < 40) return {k:"crit",t:"Критичний розрив",d:"Процеси тримаються на людях; AI тут спершу потребує наведення порядку в даних."};
+  if (p < 60) return {k:"warn",t:"Суттєві прогалини",d:"Основа є, але багато ручної роботи й розривів між відділами."};
+  if (p < 80) return {k:"mid",t:"Керовано",d:"Процеси працюють; AI дасть ефект через автоматизацію і прогнози."};
+  return {k:"ok",t:"Зріло",d:"Сильна база для AI-агентів і оптимізації в реальному часі."};
+}
+function ansLabel(a){ if (a === undefined) return "—"; if (a === "dk") return "Не знаю"; if (a === "na") return "Не стосується"; return a + " · " + LV[a].t; }
+function gaps(){
+  const list = ALLQ.map(x => ({...x, a:S.answers[x.q.id], v:val(S.answers[x.q.id])})).filter(x => x.v !== null && x.v <= 2);
+  list.sort((p,q) => p.v - q.v || (q.q.d?1:0) - (p.q.d?1:0) || B.indexOf(p.b) - B.indexOf(q.b));
+  return list;
+}
+function dirOf(b,q){ const d = q.dir || b.dir[0]; return d ? d + " " + DIRS[d] : null; }
+
+/* ---------- Render ---------- */
+function renderTop(){
+  const n = answered();
+  $("#progFill").style.width = (n/TOTAL*100) + "%";
+  $("#progNum").textContent = n + " / " + TOTAL + " питань";
+}
+function renderRail(){
+  const v = S.view;
+  let h = B.map((b,i) => {
+    const n = blockAnswered(b), done = n === b.qs.length;
+    return `<li><button type="button" class="ri${done?" done":""}" data-go="${i}" ${v===i?'aria-current="step"':""}><span class="code">${b.code}</span><span class="nm">${esc(b.short)}</span><span class="ct">${n}/${b.qs.length}</span></button></li>`;
+  }).join("");
+  h += `<li><button type="button" class="ri res" data-go="results" ${v==="results"?'aria-current="step"':""}><span class="code">→</span><span class="nm">Результати</span><span class="ct"></span></button></li>`;
+  h = `<li><button type="button" class="ri" data-go="intro" ${v==="intro"?'aria-current="step"':""}><span class="code">000</span><span class="nm">Профіль компанії</span><span class="ct"></span></button></li>` + h;
+  $("#rail").innerHTML = h;
+  const cur = $("#rail [aria-current]"); if (cur && window.matchMedia("(max-width:960px)").matches) cur.scrollIntoView({block:"nearest",inline:"center"});
+}
+function demoFlag(){
+  return S.demo ? `<div class="demo-flag"><span><b>Приклад.</b> Це умовна компанія для демонстрації, а не ваші дані.</span><button type="button" class="btn sm" data-act="clear">Очистити і заповнити своє</button></div>` : "";
+}
+function viewIntro(){
+  const p = S.profile;
+  const opt = (arr, cur) => `<option value="">Оберіть…</option>` + arr.map(x => `<option${x===cur?" selected":""}>${esc(x)}</option>`).join("");
+  return `${demoFlag()}
+  <p class="eyebrow">Самодіагностика для виробничих компаній України</p>
+  <h1>Де ваше виробництво втрачає темп між відділами</h1>
+  <p class="lead">Оцініть 12 ділянок компанії: від R&D і постачання до обладнання, навчання та даних. На виході — індекс операційної зрілості, карта розривів і перелік місць, де AI-процеси дадуть ефект першими.</p>
+  <div class="facts">
+    <div class="fact"><b>12</b><span>блоків</span></div>
+    <div class="fact"><b>${TOTAL}</b><span>тверджень</span></div>
+    <div class="fact"><b>15–20</b><span>хвилин</span></div>
+    <div class="fact"><b>.html · .xlsx</b><span>звіт для скачування</span></div>
+  </div>
+  <div class="intro-grid">
+    <form class="panel" id="profile" autocomplete="on">
+      <h3>Профіль компанії</h3>
+      <div class="form">
+        <div class="fld full"><label for="pf-company">Назва компанії</label><input id="pf-company" name="company" value="${esc(p.company)}" placeholder="ТОВ «…»"></div>
+        <div class="fld"><label for="pf-industry">Галузь</label><select id="pf-industry" name="industry">${opt(INDUSTRIES,p.industry)}</select></div>
+        <div class="fld"><label for="pf-size">Працівників</label><select id="pf-size" name="size">${opt(SIZES,p.size)}</select></div>
+        <div class="fld full"><label for="pf-role">Ваша роль</label><input id="pf-role" name="role" value="${esc(p.role)}" placeholder="Власник, директор, COO, головний інженер…"></div>
+        <div class="fld full"><label for="pf-pain">Що зараз болить найбільше</label><textarea id="pf-pain" name="pain" placeholder="Наприклад: зриви строків через запізнення комплектуючих">${esc(p.pain)}</textarea></div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn pri">${answered()?"Продовжити":"Почати самоаудит"} →</button>
+        ${S.demo||answered()?"":`<button type="button" class="btn ghost" data-act="demo">Подивитися на прикладі</button>`}
+      </div>
+      <p class="privacy">Профіль необов’язковий і потрапляє лише у ваш звіт. Відповіді зберігаються тільки у вашому браузері; AC21 нічого не отримує, доки ви самі не надішлете звіт.</p>
+    </form>
+    <div>
+      <h3>Як оцінювати</h3>
+      <p class="lead" style="font-size:15px;margin-bottom:12px">Кожне твердження описує, як виглядає «добре». Оберіть рівень, що відповідає реальності сьогодні, а не плану.</p>
+      <div class="legend">${LV.map(l => `<div class="lg"><b>${l.v}</b><div><strong>${l.t}</strong><span>${l.d}</span></div></div>`).join("")}
+        <div class="lg"><b>?</b><div><strong>Не знаю</strong><span>Рахується як 0: якщо керівництво цього не бачить, це теж розрив.</span></div></div>
+        <div class="lg"><b>—</b><div><strong>Не стосується</strong><span>Не впливає на оцінку.</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="gets">
+    <div><b>Індекс операційної зрілості</b><span>Загальна оцінка 0–100 і рівень для кожного з 12 блоків.</span></div>
+    <div><b>Готовність даних до AI</b><span>Чи є цифрова основа, на якій можна будувати агентів і прогнози.</span></div>
+    <div><b>Топ розривів</b><span>Найслабші місця з конкретним AI-рішенням для кожного.</span></div>
+    <div><b>Звіт для команди</b><span>Документ .html для друку в PDF і таблиця .xlsx з усіма відповідями.</span></div>
+  </div>`;
+}
+function qHTML(b,q,k){
+  const a = S.answers[q.id];
+  const cells = LV.map(l => `<div class="opt"><input type="radio" name="${q.id}" id="${q.id}-${l.v}" value="${l.v}"${a===l.v?" checked":""}><label for="${q.id}-${l.v}" class="cell${typeof a==="number"&&l.v<a?" on":""}"><span class="v">${l.v}</span><span class="l">${l.s}</span></label></div>`).join("");
+  const chip = (v,t) => `<label class="chip"><input type="radio" name="${q.id}" value="${v}"${a===v?" checked":""}><span>${t}</span></label>`;
+  return `<div class="q" id="q-${q.id}">
+    <div class="q-head"><span class="q-num">${b.code}.${k+1}</span><div><p class="q-t" id="t-${q.id}">${esc(q.t)}</p><details class="hint"><summary>Як виглядає «добре»</summary><p>${esc(q.h)}</p></details></div></div>
+    <div class="answer" role="radiogroup" aria-labelledby="t-${q.id}"><div class="scale">${cells}</div><div class="extra">${chip("dk","Не знаю")}${chip("na","Не стосується")}</div></div>
+  </div>`;
+}
+function viewBlock(i){
+  const b = B[i], next = B[i+1], prev = B[i-1];
+  return `${demoFlag()}<section>
+    <div class="blk-h"><p class="eyebrow">Операція ${b.code} · блок ${i+1} з ${B.length}</p><h2>${esc(b.name)}</h2><p class="lead">${esc(b.desc)}</p>
+    ${b.dir.length?`<div class="dirs">${b.dir.map(d => `<span class="dir"><em>${d}</em> ${esc(DIRS[d])}</span>`).join("")}</div>`:""}</div>
+    <p class="bprog" id="bprog">${blockAnswered(b)} з ${b.qs.length} відповідей</p>
+    ${b.qs.map((q,k) => qHTML(b,q,k)).join("")}
+    <div class="bnav">
+      <button type="button" class="btn ghost" data-go="${prev?i-1:"intro"}">← ${prev?esc(prev.short):"Профіль"}</button>
+      <button type="button" class="btn pri" data-go="${next?i+1:"results"}">${next?"Далі: "+esc(next.short):"До результатів"} →</button>
+    </div></section>`;
+}
+function radarSVG(scores, c){
+  const W = 460, cx = W/2, cy = W/2, R = 150, n = scores.length;
+  const pt = (i,r) => { const a = -Math.PI/2 + i*2*Math.PI/n; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; };
+  let s = `<svg class="radar" viewBox="0 0 ${W} ${W}" role="img" aria-label="Радар зрілості за блоками" xmlns="http://www.w3.org/2000/svg">`;
+  [25,50,75,100].forEach(r => { s += `<polygon points="${scores.map((_,i)=>pt(i,R*r/100).join(",")).join(" ")}" fill="none" stroke="${c.grid}" stroke-width="1"/>`; });
+  scores.forEach((_,i) => { const [x,y] = pt(i,R); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${c.grid}" stroke-width="1"/>`; });
+  [50,100].forEach(r => { s += `<text x="${cx+4}" y="${cy-R*r/100+12}" fill="${c.muted}" font-size="9.5">${r}</text>`; });
+  const poly = scores.map((o,i) => pt(i, R*(o.v||0)/100).join(",")).join(" ");
+  s += `<polygon points="${poly}" fill="${c.fill}" stroke="${c.line}" stroke-width="2" stroke-linejoin="round"/>`;
+  scores.forEach((o,i) => { const [x,y] = pt(i, R*(o.v||0)/100); s += `<circle cx="${x}" cy="${y}" r="3.5" fill="${o.v===null?c.muted:c.line}"/>`; });
+  scores.forEach((o,i) => {
+    const [x,y] = pt(i, R + 22); const a = Math.cos(-Math.PI/2 + i*2*Math.PI/n);
+    const anchor = Math.abs(a) < .2 ? "middle" : (a > 0 ? "start" : "end");
+    s += `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" fill="${c.muted}" font-size="10.5">${esc(o.l)} <tspan fill="${c.fg}" font-weight="600">${o.v===null?"—":o.v}</tspan></text>`;
+  });
+  return s + `</svg>`;
+}
+function viewResults(){
+  const n = answered();
+  if (!n) return `<div class="empty"><p class="eyebrow">Результати</p><h2>Ще немає відповідей</h2><p class="lead">Заповніть хоча б один блок, щоб побачити карту розривів. Або подивіться, як виглядає звіт, на прикладі умовної компанії.</p><div class="actions"><button type="button" class="btn pri" data-go="0">Почати з блоку 010 →</button><button type="button" class="btn ghost" data-act="demo">Показати приклад</button></div></div>`;
+  const ov = overall(), lv = level(ov), dr = dataReady(), dl = level(dr);
+  const sc = B.map(b => ({b, v:blockScore(b)}));
+  const g = gaps();
+  const weak = sc.filter(x => x.v !== null).sort((a,b) => a.v - b.v).slice(0,3);
+  const p = S.profile;
+  const radar = radarSVG(sc.map(x => ({l:x.b.short, v:x.v})), {grid:"var(--line)",muted:"var(--muted)",fg:"var(--fg)",fill:"var(--accent-soft)",line:"var(--accent)"});
+  return `${demoFlag()}
+  <div class="res-h"><div><p class="eyebrow">Результати самоаудиту</p><h2>${esc(p.company || "Ваша компанія")}</h2><p class="lead" style="font-size:15px">${[p.industry,p.size?p.size+" працівників":"",new Date().toLocaleDateString("uk-UA",{day:"numeric",month:"long",year:"numeric"})].filter(Boolean).map(esc).join(" · ")}</p></div>
+  ${n<TOTAL?`<p class="lead" style="font-size:14px;max-width:34ch">Заповнено ${n} з ${TOTAL}. Оцінка порахована за наявними відповідями.</p>`:""}</div>
+  <div class="kpis">
+    <div class="kpi"><span class="lab">Індекс операційної зрілості</span><span class="num">${ov}<small> / 100</small></span><span class="pill c-${lv.k}">${lv.t}</span><span class="sub">${lv.d}</span></div>
+    <div class="kpi"><span class="lab">Готовність даних до AI</span><span class="num">${dr===null?"—":dr}<small> / 100</small></span><span class="pill c-${dl.k}">${dl.t}</span><span class="sub">За ${ALLQ.filter(x=>x.q.d).length} твердженнями про цифрові дані та облік.</span></div>
+    <div class="kpi"><span class="lab">Розривів знайдено</span><span class="num">${g.length}</span><span class="sub">Тверджень з оцінкою 2 і нижче, з них ${g.filter(x=>x.v<=1).length} критичних (0–1 або «не знаю»).</span></div>
+  </div>
+  <div class="map">
+    <div>${radar}</div>
+    <div class="bars">${sc.map((x,i) => { const l = level(x.v); return `<button type="button" class="bar c-${l.k}" data-go="${i}" title="Відкрити блок"><span class="bc">${x.b.code}</span><span class="bn" style="color:var(--fg)">${esc(x.b.name)}</span><span class="bt"><i style="width:${x.v||0}%"></i></span><span class="bv">${x.v===null?"—":x.v}</span></button>`; }).join("")}</div>
+  </div>
+  <section class="sec"><p class="eyebrow">З чого почати</p><h2>Три блоки з найбільшим розривом</h2>
+    <div class="prio">${weak.map((x,i) => { const l = level(x.v); const top = gaps().filter(y => y.b === x.b).slice(0,2); return `<div class="panel"><span class="rk">#${i+1} · ${x.b.code}</span><h3>${esc(x.b.name)}</h3><span class="pill c-${l.k}">${x.v} · ${l.t}</span><p style="font-size:14px;color:var(--muted)">${top.map(t => esc(t.q.ai)).join(" ")||"Суттєвих прогалин не виявлено."}</p>${x.b.dir.length?`<p class="dir" style="width:max-content;max-width:100%"><em>${x.b.dir[0]}</em> ${esc(DIRS[x.b.dir[0]])}</p>`:""}</div>`; }).join("")}</div>
+  </section>
+  <section class="sec"><p class="eyebrow">Топ розривів</p><h2>Де AI-процеси дадуть ефект першими</h2><p class="lead">Найнижчі оцінки; при однаковому балі вище стоять ті, де бракує цифрових даних, бо від них залежать решта рішень.</p>
+    <div class="gaps">${g.slice(0,8).map((x,i) => `<div class="gap"><span class="gn">${String(i+1).padStart(2,"0")}</span><div><div class="gm"><span>${x.b.code} ${esc(x.b.name)}</span><span class="c-${x.v<=1?"crit":"warn"}">${esc(ansLabel(x.a))}</span>${dirOf(x.b,x.q)?`<span>AC21 · ${esc(dirOf(x.b,x.q))}</span>`:""}</div><p class="gt">${esc(x.q.t)}</p><p class="ga"><b>Рішення</b>${esc(x.q.ai)}</p></div></div>`).join("") || `<p class="lead">Оцінок 2 і нижче немає. Сильний результат.</p>`}</div>
+  </section>
+  <section class="sec"><p class="eyebrow">Деталізація</p><h2>Відповіді за блоками</h2>
+    <div>${B.map(b => { const v = blockScore(b), l = level(v); return `<details class="det"><summary><span class="bc">${b.code}</span><span class="bn">${esc(b.name)}</span><span class="pill c-${l.k}">${v===null?"—":v}</span></summary><div class="det-body">${b.qs.map(q => { const a = S.answers[q.id], vv = val(a); return `<div class="drow"><span>${esc(q.t)}</span><span class="ans c-${vv===null?"na":vv<=1?"crit":vv===2?"warn":"ok"}">${esc(ansLabel(a))}</span>${vv!==null&&vv<=2?`<span class="rec"><b>Рішення:</b> ${esc(q.ai)}</span>`:""}</div>`; }).join("")}</div></details>`; }).join("")}</div>
+  </section>
+  <section class="sec panel export"><div><h3>Скачати результати</h3><p style="font-size:14px;color:var(--muted)">Звіт .html відкривається в будь-якому браузері, його можна роздрукувати чи зберегти в PDF. Таблиця .xlsx містить усі відповіді й рекомендації для роботи в Excel чи Google Таблицях.</p><p class="ex-note" id="exNote"></p></div>
+    <div class="btns"><button type="button" class="btn pri" data-act="dl-html">Звіт .html</button><button type="button" class="btn" data-act="dl-xlsx">Таблиця .xlsx</button><button type="button" class="btn ghost" data-act="copy">Копіювати підсумок</button></div></section>
+  <section class="cta"><div><p class="eyebrow">Наступний крок</p><h2>Обговорити результати з AC21</h2><p class="lead" style="font-size:15px">Самоаудит показує, де болить. Незалежний операційний аудит AC21 показує чому і з якого напрямку AI-рішення окупиться першим. Надішліть звіт, і ми розберемо його разом з вами.</p></div>
+    <div class="contacts">${CONTACTS.map(c => `<div><span>${c.l}</span><a href="${c.h}" target="_blank" rel="noopener">${c.t}</a></div>`).join("")}</div></section>
+  <div class="actions" style="margin-top:28px"><button type="button" class="btn ghost sm" data-act="reset">Почати спочатку</button></div>`;
+}
+function render(focus){
+  const m = $("#main");
+  if (S.view === "intro") m.innerHTML = viewIntro();
+  else if (S.view === "results") m.innerHTML = viewResults();
+  else m.innerHTML = viewBlock(S.view);
+  renderRail(); renderTop(); updateExNote();
+  if (focus) { window.scrollTo({top:0}); m.focus({preventScroll:true}); }
+  if (S.view === "results" && answered()) loadXLSX().catch(()=>{});
+}
+function go(v){ S.view = v; save(); render(true); }
+
+/* ---------- Events ---------- */
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) { const v = g.dataset.go; go(isNaN(+v) ? v : +v); return; }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  const act = a.dataset.act;
+  if (act === "results") go("results");
+  else if (act === "demo") loadDemo();
+  else if (act === "clear" || act === "reset") { S = {profile:{company:"",industry:"",size:"",role:"",pain:""},answers:{},view:"intro",demo:false}; save(); render(true); toast(act==="clear"?"Приклад очищено":"Відповіді очищено"); }
+  else if (act === "dl-html") dlHTML();
+  else if (act === "dl-xlsx") dlXLSX();
+  else if (act === "copy") copySummary();
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.closest("#profile")) { S.profile[t.name] = t.value; save(); return; }
+  if (t.type === "radio" && ALLQ.some(x => x.q.id === t.name)) {
+    const v = t.value; S.answers[t.name] = (v === "dk" || v === "na") ? v : +v; save();
+    const box = t.closest(".q"); box.querySelectorAll(".cell").forEach((c,i) => c.classList.toggle("on", typeof S.answers[t.name] === "number" && i < S.answers[t.name]));
+    const b = B[S.view]; if (b) $("#bprog").textContent = blockAnswered(b) + " з " + b.qs.length + " відповідей";
+    renderRail(); renderTop();
+  }
+});
+document.addEventListener("input", e => { const t = e.target; if (t.closest("#profile")) { S.profile[t.name] = t.value; save(); } });
+document.addEventListener("submit", e => { if (e.target.id === "profile") { e.preventDefault(); const firstOpen = B.findIndex(b => blockAnswered(b) < b.qs.length); go(firstOpen < 0 ? "results" : firstOpen); } });
+
+function loadDemo(){
+  const base = {mgmt:2,rnd:1,mkt:1,sales:2,prod:2,supply:2,stock:3,equip:1,quality:2,people:1,fin:2,data:1};
+  const off = [0,1,-1,0,1,-1];
+  S.answers = {};
+  B.forEach(b => b.qs.forEach((q,k) => { S.answers[q.id] = Math.max(0, Math.min(4, base[b.id] + off[(k + b.code.length + B.indexOf(b)) % 6])); }));
+  S.answers.f3 = "dk"; S.answers.k5 = "dk"; S.answers.u5 = "na";
+  S.profile = {company:"ТОВ «Приклад-Машбуд» (умовна компанія)",industry:"Машинобудування",size:"50–250",role:"Операційний директор",pain:"Зриви строків через запізнення комплектуючих і ручне зведення статусів з чатів."};
+  S.demo = true; S.view = "results"; save(); render(true);
+}
+
+/* ---------- Toast ---------- */
+let tt; function toast(m){ const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3200); }
+
+/* ---------- Downloads ---------- */
+function updateExNote(){}
+function saveFile(filename, data){
+  try {
+    const blob = data instanceof Blob ? data : new Blob([data], {type: filename.endsWith(".html") ? "text/html;charset=utf-8" : "application/octet-stream"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast("Файл збережено");
+  } catch(e) { toast("Не вдалося зберегти файл. Скористайтеся «Копіювати підсумок»."); }
+}
+function fileBase(){
+  const c = (S.profile.company || "kompaniia").replace(/[«»"'\\/:*?<>|]+/g,"").trim().replace(/\s+/g,"_").slice(0,60) || "kompaniia";
+  return "AC21_samoaudyt_" + c + "_" + new Date().toISOString().slice(0,10);
+}
+let xlsxP = null;
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!xlsxP) xlsxP = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => { xlsxP = null; rej(new Error("load")); }; document.head.appendChild(s); });
+  return xlsxP;
+}
+async function dlXLSX(){
+  if (!answered()) { toast("Спершу дайте хоча б одну відповідь"); return; }
+  let X; try { X = await loadXLSX(); } catch(e) { toast("Не вдалося завантажити модуль таблиць. Перевірте з’єднання."); return; }
+  const p = S.profile, ov = overall(), dr = dataReady();
+  const sum = [["Операційний самоаудит AC21 Industrial Systems"],[],["Компанія",p.company||""],["Галузь",p.industry||""],["Працівників",p.size||""],["Роль респондента",p.role||""],["Головний біль",p.pain||""],["Дата",new Date().toLocaleDateString("uk-UA")],[],
+    ["Індекс операційної зрілості",ov,level(ov).t],["Готовність даних до AI",dr,level(dr).t],["Заповнено",answered()+" з "+TOTAL],[],["Код","Блок","Оцінка (0–100)","Рівень","Відповідей","Напрям AC21"]];
+  B.forEach(b => { const v = blockScore(b); sum.push([b.code,b.name,v===null?"":v,level(v).t,blockAnswered(b)+"/"+b.qs.length,b.dir.map(d=>d+" "+DIRS[d]).join("; ")]); });
+  const rows = [["Код","Блок","Твердження","Як виглядає «добре»","Відповідь","Бал (0–4)","Дані для AI","Рекомендація (якщо бал ≤ 2)","Напрям AC21"]];
+  B.forEach(b => b.qs.forEach((q,k) => { const a = S.answers[q.id], v = val(a); rows.push([b.code+"."+(k+1),b.name,q.t,q.h,ansLabel(a),v===null?"":v,q.d?"так":"",v!==null&&v<=2?q.ai:"",dirOf(b,q)||""]); }));
+  const gp = [["№","Блок","Твердження","Відповідь","Рішення","Напрям AC21"]]; gaps().forEach((x,i) => gp.push([i+1,x.b.code+" "+x.b.name,x.q.t,ansLabel(x.a),x.q.ai,dirOf(x.b,x.q)||""]));
+  const wb = X.utils.book_new();
+  const s1 = X.utils.aoa_to_sheet(sum); s1["!cols"] = [{wch:30},{wch:34},{wch:16},{wch:20},{wch:12},{wch:44}];
+  const s2 = X.utils.aoa_to_sheet(rows); s2["!cols"] = [{wch:8},{wch:24},{wch:70},{wch:50},{wch:16},{wch:10},{wch:10},{wch:70},{wch:34}]; s2["!autofilter"] = {ref:"A1:I"+rows.length};
+  const s3 = X.utils.aoa_to_sheet(gp); s3["!cols"] = [{wch:5},{wch:28},{wch:70},{wch:16},{wch:70},{wch:34}];
+  X.utils.book_append_sheet(wb, s1, "Підсумок"); X.utils.book_append_sheet(wb, s3, "Розриви"); X.utils.book_append_sheet(wb, s2, "Відповіді");
+  const buf = X.write(wb, {bookType:"xlsx", type:"array"});
+  saveFile(fileBase() + ".xlsx", new Blob([buf]));
+}
+function dlHTML(){
+  if (!answered()) { toast("Спершу дайте хоча б одну відповідь"); return; }
+  saveFile(fileBase() + ".html", reportHTML());
+}
+function reportHTML(){
+  const p = S.profile, ov = overall(), lv = level(ov), dr = dataReady(), dl = level(dr);
+  const col = {crit:"#C23A2E",warn:"#A87310",mid:"#2C6A94",ok:"#2C7E4C",na:"#8A847D"};
+  const sc = B.map(b => ({b, v:blockScore(b)}));
+  const radar = radarSVG(sc.map(x => ({l:x.b.short, v:x.v})), {grid:"#DAD7D2",muted:"#6B655F",fg:"#171615",fill:"rgba(210,86,10,.14)",line:"#D2560A"}).replace('class="radar"','style="width:100%;max-width:420px;height:auto"');
+  const g = gaps(); const date = new Date().toLocaleDateString("uk-UA",{day:"numeric",month:"long",year:"numeric"});
+  const pill = l => `<span style="display:inline-block;border:1px solid ${col[l.k]};color:${col[l.k]};border-radius:99px;padding:2px 9px;font:600 11px/1.6 'IBM Plex Mono',monospace">${l.t}</span>`;
+  return `<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Самоаудит AC21 · ${esc(p.company||"Компанія")}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+@page{size:A4;margin:16mm 14mm}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#171615;font:14px/1.55 "IBM Plex Sans",Arial,sans-serif}
+.w{max-width:860px;margin:0 auto;padding:36px 24px 60px}
+h1{font:700 32px/1.1 Geologica,Arial,sans-serif;margin:10px 0 6px;letter-spacing:-.02em}
+h2{font:600 20px/1.2 Geologica,Arial,sans-serif;margin:34px 0 12px;break-after:avoid}
+.ey{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.09em;text-transform:uppercase;color:#D2560A}
+.mu{color:#6B655F}.hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #171615;padding-bottom:12px}
+.mk{background:#E8620A;color:#141414;font:700 13px Geologica,Arial;padding:6px 8px;margin-right:8px}
+.k{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #DAD7D2;margin-top:22px}.k div{padding:14px 16px;border-left:1px solid #DAD7D2}.k div:first-child{border-left:0}
+.k b{display:block;font:700 34px/1.1 Geologica,Arial}.k small{font:600 10.5px "IBM Plex Mono",monospace;letter-spacing:.07em;text-transform:uppercase;color:#6B655F}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font:600 10.5px "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#6B655F;border-bottom:1px solid #171615;padding:6px 8px}
+td{border-bottom:1px solid #E6E3DF;padding:7px 8px;vertical-align:top}tr{break-inside:avoid}
+.bar{height:7px;background:#EEECE9;position:relative;min-width:80px}.bar i{position:absolute;left:0;top:0;bottom:0}
+.gp{border-top:1px solid #E6E3DF;padding:12px 0;break-inside:avoid}.gp .r{border-left:2px solid #D2560A;background:#FAF9F7;padding:7px 10px;margin-top:6px}
+.cta{margin-top:36px;border:1px solid #DAD7D2;border-top:3px solid #D2560A;padding:18px 20px;break-inside:avoid}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
+@media(max-width:640px){.k,.two{grid-template-columns:1fr}.k div{border-left:0;border-top:1px solid #DAD7D2}}
+</style></head><body><div class="w">
+<div class="hd"><div style="display:flex;align-items:center"><span class="mk">AC21</span><b>AC21 Industrial Systems</b></div><span class="mu" style="font:500 12px 'IBM Plex Mono',monospace">${esc(date)}</span></div>
+<p class="ey" style="margin-top:26px">Операційний самоаудит${S.demo?" · приклад":""}</p>
+<h1>${esc(p.company||"Компанія")}</h1>
+<p class="mu">${[p.industry,p.size?p.size+" працівників":"",p.role?"Заповнив(ла): "+p.role:""].filter(Boolean).map(esc).join(" · ")}</p>
+${p.pain?`<p style="margin-top:10px"><b>Головний біль:</b> ${esc(p.pain)}</p>`:""}
+<div class="k"><div><small>Індекс зрілості</small><b>${ov}<span class="mu" style="font-size:16px"> / 100</span></b>${pill(lv)}</div><div><small>Готовність даних до AI</small><b>${dr===null?"—":dr}<span class="mu" style="font-size:16px"> / 100</span></b>${pill(dl)}</div><div><small>Розривів (бал ≤ 2)</small><b>${g.length}</b><span class="mu">Заповнено ${answered()} з ${TOTAL}</span></div></div>
+<p style="margin-top:14px">${esc(lv.d)}</p>
+<h2>Карта зрілості за блоками</h2>
+<div class="two"><div>${radar}</div><table><tbody>${sc.map(x => { const l = level(x.v); return `<tr><td class="mu" style="font-family:'IBM Plex Mono',monospace">${x.b.code}</td><td>${esc(x.b.name)}</td><td style="width:32%"><div class="bar"><i style="width:${x.v||0}%;background:${col[l.k]}"></i></div></td><td style="text-align:right;font-weight:600">${x.v===null?"—":x.v}</td></tr>`; }).join("")}</tbody></table></div>
+<h2>Топ розривів і рекомендовані рішення</h2>
+${g.slice(0,10).map((x,i) => `<div class="gp"><span class="ey" style="color:#6B655F">${String(i+1).padStart(2,"0")} · ${x.b.code} ${esc(x.b.name)} · <span style="color:${x.v<=1?col.crit:col.warn}">${esc(ansLabel(x.a))}</span></span><div style="font-weight:500;margin-top:4px">${esc(x.q.t)}</div><div class="r"><b>Рішення:</b> ${esc(x.q.ai)}${dirOf(x.b,x.q)?`<br><span class="mu">Напрям AC21: ${esc(dirOf(x.b,x.q))}</span>`:""}</div></div>`).join("") || "<p>Розривів з оцінкою 2 і нижче не виявлено.</p>"}
+<h2>Усі відповіді</h2>
+<table><thead><tr><th>Код</th><th>Твердження</th><th>Відповідь</th></tr></thead><tbody>${B.map(b => `<tr><td colspan="3" style="background:#F3F3F1;font-weight:600">${b.code} · ${esc(b.name)} — ${blockScore(b)===null?"—":blockScore(b)+" / 100"}</td></tr>` + b.qs.map((q,k) => { const a = S.answers[q.id], v = val(a); return `<tr><td class="mu" style="font-family:'IBM Plex Mono',monospace;white-space:nowrap">${b.code}.${k+1}</td><td>${esc(q.t)}${v!==null&&v<=2?`<div class="mu" style="font-size:12px;margin-top:3px">→ ${esc(q.ai)}</div>`:""}</td><td style="white-space:nowrap;color:${v===null?col.na:v<=1?col.crit:v===2?col.warn:col.ok};font-weight:600">${esc(ansLabel(a))}</td></tr>`; }).join("")).join("")}</tbody></table>
+<h2>Методика</h2>
+<p class="mu">Кожне твердження оцінюється за шкалою 0–4: 0 — відсутнє, 1 — стихійно, 2 — частково, 3 — системно, 4 — цифрово. «Не знаю» рахується як 0, «Не стосується» виключається. Оцінка блоку — середній бал, переведений у 0–100; індекс зрілості — середнє блоків. Готовність даних до AI рахується за твердженнями про наявність цифрових даних. Рівні: до 40 — критичний розрив, 40–59 — суттєві прогалини, 60–79 — керовано, від 80 — зріло. Це самооцінка; незалежний аудит перевіряє її на реальних даних компанії.</p>
+<div class="cta"><p class="ey">Наступний крок</p><p style="font:600 18px Geologica,Arial;margin:6px 0">Незалежний операційний аудит AC21</p><p class="mu">AC21 Industrial Systems виконує функцію Chief AI Officer на аутсорсі для виробників. Надішліть цей звіт, і ми розберемо, з якого напрямку AI-рішення окупиться першим.</p><p style="font-family:'IBM Plex Mono',monospace;margin-top:10px">WhatsApp: +380 67 779 95 36 · +380 93 486 41 17<br>www.ac21industrial.com</p></div>
+</div></body></html>`;
+}
+function summaryText(){
+  const p = S.profile, ov = overall(), dr = dataReady();
+  let t = `Операційний самоаудит AC21 — ${p.company||"компанія"}\n${new Date().toLocaleDateString("uk-UA")}\n\nІндекс операційної зрілості: ${ov}/100 (${level(ov).t})\nГотовність даних до AI: ${dr===null?"—":dr}/100 (${level(dr).t})\nЗаповнено: ${answered()} з ${TOTAL}\n\nБлоки:\n`;
+  B.forEach(b => { const v = blockScore(b); t += `${b.code} ${b.name}: ${v===null?"—":v}\n`; });
+  t += `\nТоп розривів:\n`; gaps().slice(0,8).forEach((x,i) => { t += `${i+1}. [${x.b.short}] ${x.q.t} — ${ansLabel(x.a)}\n   Рішення: ${x.q.ai}\n`; });
+  return t + `\nAC21 Industrial Systems · www.ac21industrial.com · WhatsApp +380 67 779 95 36`;
+}
+function copySummary(){
+  if (!answered()) { toast("Спершу дайте хоча б одну відповідь"); return; }
+  const txt = summaryText();
+  const fallback = () => { const ta = document.createElement("textarea"); ta.value = txt; ta.setAttribute("readonly",""); ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch(e) {} ta.remove(); toast(ok ? "Підсумок скопійовано" : "Не вдалося скопіювати автоматично"); };
+  try { navigator.clipboard.writeText(txt).then(() => toast("Підсумок скопійовано"), fallback); } catch(e) { fallback(); }
+}
+
+render(false);
+})();
+</script>
+</body>
+</html>
